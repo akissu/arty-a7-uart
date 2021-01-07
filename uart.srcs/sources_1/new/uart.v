@@ -21,28 +21,35 @@
 
 
 module uart(
-    input clk,
+    input clk100mhz,
     input reset,
-    input rxd,
-    output reg [7:0] outb,
-    output reg valid = 0
+    input uart_txd_in,
+    output uart_rxd_out
     );
+    //outputs
+    reg [7:0] outb = 0;
+    reg valid = 0;
+    
+    //vars
     reg [25:0] accum = 0;
     wire pps = (accum == 0);
     reg [9:0] dat = 0;
     reg start_bit = 0;
     wire end_bit = dat[9];
+    wire last_dat_bit = dat[1];
+    assign uart_rxd_out = !uart_txd_in;
     
-    always @(negedge rxd) begin
+    
+    always @(negedge uart_txd_in) begin
         start_bit <= 1;
     end
     
-    always @(posedge clk) begin
+    always @(posedge clk100mhz) begin
         //TODO set proper baud
         accum <= (pps ? 50_000_000 : accum) - 1;
         if (pps) begin
             if (start_bit) begin
-                dat <= (dat << 1) | rxd;
+                dat <= (dat << 1) | uart_txd_in;
             end
         end
     end
