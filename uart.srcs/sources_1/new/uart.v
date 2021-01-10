@@ -22,42 +22,56 @@
 
 module uart(
     input clk100mhz,
-    input reset,
+    input ck_rst,
     input uart_txd_in,
-    output uart_rxd_out
+    output uart_rxd_out,
+    output valid,
+    output a1,
+    output led0_g,
+    output led1_g,
+    output led2_g,
+    output led3_g
     );
-    //outputs
-    reg [7:0] outb = 0;
-    reg valid = 0;
-    
-    //vars
     reg [25:0] accum = 0;
+    reg [7:0] i = 0;
+    reg [7:0] outb = 0;
+    reg [7:0] dat = 0;
+    reg validb = 0;
     wire pps = (accum == 0);
-    reg [9:0] dat = 0;
-    reg start_bit = 0;
-    wire end_bit = dat[9];
-    wire last_dat_bit = dat[1];
-    assign uart_rxd_out = !uart_txd_in;
-    
-    
-    always @(negedge uart_txd_in) begin
-        start_bit <= 1;
-    end
+    assign valid = validb;
+    assign led0_g = outb[0];
+    assign led1_g = outb[1];
+    assign led2_g = outb[2];
+    assign led3_g = outb[3];
+    assign uart_rxd_out = uart_txd_in;
+    assign a1 = uart_txd_in;
     
     always @(posedge clk100mhz) begin
-        //TODO set proper baud
-        accum <= (pps ? 50_000_000 : accum) - 1;
-        if (pps) begin
-            if (start_bit) begin
-                dat <= (dat << 1) | uart_txd_in;
+        //100mhz/(baud 115200 * 10-bit) = 868.05
+        accum <= (pps ? 868 : accum) - 1;
+        if (ck_rst == 0) begin
+            accum <= 0;
+            outb <= 0;
+            i <= 0;
+        end
+        else if (pps) begin
+            validb <= 1;
+            if (i == 0) begin
+                if (uart_txd_in == 0) begin
+                    i <= 1;
+                end
+            end
+            else if (i < 9) begin
+                dat[i - 1] = uart_txd_in;
+                i <= (i + 1);
+            end
+            else begin
+                outb <= dat;
+                i <= 0;
+                if (uart_txd_in == 1) begin
+                    validb <= 0;
+                end
             end
         end
-    end
-    
-    always @(end_bit) begin
-        valid <= dat[0];
-        outb <= dat[8:1];
-        dat <= 0;
-        start_bit <= 0;
     end
 endmodule
